@@ -4,15 +4,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+    "os"
 	"net/http"
+    "database/sql"
 	"strings"
 	"sync/atomic"
+
+    "github.com/joho/godotenv"
+    _ "github.com/lib/pq"
+    "Chirpy/internal/database"
 )
 
 func main() {
+    apiCfg := &apiConfig{}
+    godotenv.Load()
+    dbURL := os.Getenv("DB_URL")
+    db, err := sql.Open("postgres", dbURL)
+    if err != nil {
+        fmt.Println(err)
+        os.Exit(1)
+    }
+    dbQueries := database.New(db)
+    apiCfg.dbQueries = dbQueries
+
 	filepathRoot := "."
 	port := "8080"
-	apiCfg := &apiConfig{}
 	
 	mux := http.NewServeMux()
 	mux.Handle("/app/", http.StripPrefix("/app", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(filepathRoot)))))
@@ -86,6 +102,7 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 }
 type apiConfig struct {
 	fileserverHits atomic.Int32
+    dbQueries      *database.Queries
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
