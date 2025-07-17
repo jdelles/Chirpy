@@ -1,15 +1,22 @@
 package handlers
 
 import (
-	"context"
+    "context"
 	"encoding/json"
 	"log"
 	"net/http"
+    "time"
+
+    "github.com/google/uuid"
+
+    "Chirpy/internal/auth"
+	"Chirpy/internal/database"
 )
 
 func (cfg *ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) {
     type parameters struct {
         Email string `json:"email"`
+        Password string `json:"password"`
     }
     params := parameters{}
     
@@ -23,15 +30,38 @@ func (cfg *ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) 
     }
 
     email := params.Email
+    hashedPassword, err := auth.HashPassword(params.Password)
+    if err != nil {
+        RespondWithError(w, http.StatusBadRequest, err.Error())
+    }
+
+    createUserParams := database.CreateUserParams{
+        Email: email,
+        HashedPassword: hashedPassword,
+    }
 
     log.Printf("Creating user with email: %s", email)
 
     ctx := context.Background()
-    user, err := cfg.DbQueries.CreateUser(ctx, email)
+    user, err := cfg.DbQueries.CreateUser(ctx, createUserParams)
     if err != nil {
         RespondWithError(w, http.StatusBadRequest, "Failed to create user")
         return
     }
 
-    RespondWithJSON(w, http.StatusCreated, user)
+    type userResponse struct {
+        ID        uuid.UUID `json:"id"`
+        CreatedAt time.Time `json:"created_at"`
+        UpdatedAt time.Time `json:"updated_at"`
+        Email     string    `json:"email"`
+    }
+
+    response := userResponse{
+        ID:        user.ID,
+        CreatedAt: user.CreatedAt,
+        UpdatedAt: user.UpdatedAt,
+        Email:     user.Email,
+    }
+
+    RespondWithJSON(w, http.StatusCreated, response)
 }
