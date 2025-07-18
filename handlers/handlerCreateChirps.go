@@ -1,20 +1,33 @@
 package handlers
 
 import (
-	"Chirpy/internal/database"
-	"context"
+    "context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
-
+    
 	"github.com/google/uuid"
+    
+	"Chirpy/internal/auth"
+    "Chirpy/internal/database"
 )
 
 func (cfg *ApiConfig) HandlerCreateChirps(w http.ResponseWriter, r *http.Request) {
- type parameters struct {
+    token, err := auth.GetBearerToken(r.Header)
+    if err != nil {
+        RespondWithError(w, http.StatusUnauthorized, "Missing or invalid authorization header")
+        return
+    }
+
+    userID, err := auth.ValidateJWT(token, cfg.JwtSecret) 
+    if err != nil {
+        RespondWithError(w, http.StatusUnauthorized, "Invalid token")
+        return
+    }
+
+    type parameters struct {
         Body string `json:"body"`
-		UserID uuid.NullUUID `json:"user_id"`
     }
     params := parameters{}
 
@@ -24,7 +37,7 @@ func (cfg *ApiConfig) HandlerCreateChirps(w http.ResponseWriter, r *http.Request
     
     decoder := json.NewDecoder(r.Body)
     
-    err := decoder.Decode(&params)
+    err = decoder.Decode(&params)
     if err != nil {
         log.Printf("Error decoding parameters %s", err)
         RespondWithError(w, http.StatusBadRequest, "Something went wrong")
@@ -36,10 +49,27 @@ func (cfg *ApiConfig) HandlerCreateChirps(w http.ResponseWriter, r *http.Request
         return
     }
 
+    cleanedBody := cleanProfaneWords(params.Body)
+
+	createChirpParams := database.CreateChirpParams{
+		Body: cleanedBody,
+		UserID: uuid.NullUUID{UUID: userID, Valid: true},
+	}
+
+	chirp, err := cfg.DbQueries.CreateChirp(context.Background(), createChirpParams)
+	if err != nil {
+		RespondWithError(w, http.StatusBadRequest, "Unable to create chirp")
+	}
+
+    RespondWithJSON(w, http.StatusCreated, chirp)
+}
+
+func cleanProfaneWords(body string) string {
     replacement := "****"
     badWords := []string{"kerfuffle", "sharbert", "fornax"}
-    splitString := strings.Split(params.Body, " ")
+    splitString := strings.Split(body, " ")
     cleanedWords := make([]string, len(splitString))
+    
     for i, word := range splitString {
         found := false
         for _, bad := range badWords {
@@ -54,17 +84,6 @@ func (cfg *ApiConfig) HandlerCreateChirps(w http.ResponseWriter, r *http.Request
             cleanedWords[i] = word
         }
     }
-    result := strings.Join(cleanedWords, " ")
-
-	createChirpParams := database.CreateChirpParams{
-		Body: result,
-		UserID: params.UserID,
-	}
-
-	chirp, err := cfg.DbQueries.CreateChirp(context.Background(), createChirpParams)
-	if err != nil {
-		RespondWithError(w, http.StatusBadRequest, "Unable to create chirp")
-	}
-
-    RespondWithJSON(w, http.StatusCreated, chirp)
+    
+    return strings.Join(cleanedWords, " ")
 }

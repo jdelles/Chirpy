@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-    "Chirpy/handlers"
+	"Chirpy/handlers"
 	"Chirpy/internal/database"
 
 	"github.com/joho/godotenv"
@@ -15,38 +15,43 @@ import (
 )
 
 func main() {
-    apiCfg := &handlers.ApiConfig{}
-    godotenv.Load()
-    dbURL := os.Getenv("DB_URL")
-    db, err := sql.Open("postgres", dbURL)
-    if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
-    }
-    dbQueries := database.New(db)
-    apiCfg.DbQueries = dbQueries
-    platform := os.Getenv("PLATFORM")
-    apiCfg.Platform = platform
+	apiCfg := &handlers.ApiConfig{}
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	dbQueries := database.New(db)
+	apiCfg.DbQueries = dbQueries
+	platform := os.Getenv("PLATFORM")
+	apiCfg.Platform = platform
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	apiCfg.JwtSecret = jwtSecret
 
 	filepathRoot := "."
 	port := "8080"
-	
+
 	mux := http.NewServeMux()
 	mux.Handle("/app/", http.StripPrefix("/app", apiCfg.MiddlewareMetricsInc(http.FileServer(http.Dir(filepathRoot)))))
 	mux.HandleFunc("GET /api/healthz", handlers.HandlerReadiness)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.HandlerMetrics)
 	mux.HandleFunc("POST /admin/reset", apiCfg.HandlerReset)
-    mux.HandleFunc("POST /api/users", apiCfg.HandlerCreateUser)
-    mux.HandleFunc("POST /api/chirps", apiCfg.HandlerCreateChirps)
+	mux.HandleFunc("POST /api/users", apiCfg.HandlerCreateUser)
+	mux.HandleFunc("POST /api/chirps", apiCfg.HandlerCreateChirps)
 	mux.HandleFunc("GET /api/chirps", apiCfg.HandlerReadChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.HandlerReadChirpsByID)
 	mux.HandleFunc("POST /api/login", apiCfg.HandlerLogin)
-	
+	mux.HandleFunc("POST /api/refresh", apiCfg.HandlerRefresh)
+	mux.HandleFunc("POST /api/revoke", apiCfg.HandlerRevoke)
+
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
-	
+
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(srv.ListenAndServe())
 }
