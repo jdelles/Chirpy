@@ -43,24 +43,26 @@ func (cfg *ApiConfig) HandlerCreateUser(w http.ResponseWriter, r *http.Request) 
     log.Printf("Creating user with email: %s", email)
 
     ctx := context.Background()
-    user, err := cfg.DbQueries.CreateUser(ctx, createUserParams)
+    newUser, err := cfg.DbQueries.CreateUser(ctx, createUserParams)
     if err != nil {
         RespondWithError(w, http.StatusBadRequest, "Failed to create user")
         return
     }
 
     type userResponse struct {
-        ID        uuid.UUID `json:"id"`
-        CreatedAt time.Time `json:"created_at"`
-        UpdatedAt time.Time `json:"updated_at"`
-        Email     string    `json:"email"`
+        ID          uuid.UUID `json:"id"`
+        CreatedAt   time.Time `json:"created_at"`
+        UpdatedAt   time.Time `json:"updated_at"`
+        Email       string    `json:"email"`
+        IsChirpyRed bool      `json:"is_chirpy_red"`
     }
 
     response := userResponse{
-        ID:        user.ID,
-        CreatedAt: user.CreatedAt,
-        UpdatedAt: user.UpdatedAt,
-        Email:     user.Email,
+        ID:          newUser.ID,
+        CreatedAt:   newUser.CreatedAt,
+        UpdatedAt:   newUser.UpdatedAt,
+        Email:       newUser.Email,
+        IsChirpyRed: newUser.IsChirpyRed,
     }
 
     RespondWithJSON(w, http.StatusCreated, response)

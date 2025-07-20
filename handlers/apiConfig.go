@@ -11,4 +11,5 @@ type ApiConfig struct {
 	FileserverHits atomic.Int32
     Platform       string
 	JwtSecret      string
+	PolkaKey       string
 }

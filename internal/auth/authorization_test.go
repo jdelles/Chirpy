@@ -108,3 +108,82 @@ func TestMakeRefreshToken(t *testing.T) {
         t.Error("Two consecutive tokens should be different")
     }
 }
+
+func TestGetAPIKey(t *testing.T) {
+    tests := []struct {
+        name           string
+        authHeader     string
+        expectedKey    string
+        expectedError  bool
+    }{
+        {
+            name:          "valid API key",
+            authHeader:    "ApiKey abc123key",
+            expectedKey:   "abc123key",
+            expectedError: false,
+        },
+        {
+            name:          "valid API key with extra spaces",
+            authHeader:    "ApiKey   abc123key   ",
+            expectedKey:   "abc123key",
+            expectedError: false,
+        },
+        {
+            name:          "case insensitive ApiKey",
+            authHeader:    "apikey abc123key",
+            expectedKey:   "abc123key",
+            expectedError: false,
+        },
+        {
+            name:          "missing authorization header",
+            authHeader:    "",
+            expectedKey:   "",
+            expectedError: true,
+        },
+        {
+            name:          "invalid format - no ApiKey prefix",
+            authHeader:    "abc123key",
+            expectedKey:   "",
+            expectedError: true,
+        },
+        {
+            name:          "invalid format - wrong prefix",
+            authHeader:    "Bearer abc123key",
+            expectedKey:   "",
+            expectedError: true,
+        },
+        {
+            name:          "ApiKey with no key",
+            authHeader:    "ApiKey",
+            expectedKey:   "",
+            expectedError: true,
+        },
+        {
+            name:          "ApiKey with empty key",
+            authHeader:    "ApiKey   ",
+            expectedKey:   "",
+            expectedError: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            headers := make(http.Header)
+            if tt.authHeader != "" {
+                headers.Set("Authorization", tt.authHeader)
+            }
+
+            key, err := GetAPIKey(headers)
+
+            if tt.expectedError && err == nil {
+                t.Errorf("Expected error but got none")
+            }
+            if !tt.expectedError && err != nil {
+                t.Errorf("Expected no error but got: %v", err)
+            }
+            if key != tt.expectedKey {
+                t.Errorf("Expected key '%s', got '%s'", tt.expectedKey, key)
+            }
+        })
+    }
+}
